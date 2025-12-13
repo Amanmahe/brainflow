@@ -10,6 +10,7 @@
 #ifdef _WIN32
 #pragma comment(lib, "ws2_32.lib")
 #include <WinSock2.h>
+#include <windows.h>
 #endif
 
 OricBoard::OricBoard (struct BrainFlowInputParams params)
@@ -78,7 +79,7 @@ int OricBoard::prepare_session ()
     safe_logger (spdlog::level::info, "Connecting to Oric board at {}", ws_url);
     
     // Create WebSocket connection
-    ws = WebSocket::from_url(ws_url);
+    ws = easywsclient::WebSocket::from_url(ws_url);
     
     if (!ws)
     {
@@ -189,10 +190,13 @@ int OricBoard::release_session ()
     keep_alive = false;
     connected = false;
     
-    if (ws)
     {
-        ws->close();
-        ws = nullptr; // Set to null pointer
+        std::lock_guard<std::mutex> lock(ws_mutex);
+        if (ws)
+        {
+            ws->close();
+            ws.reset(); // Use reset() instead of setting to nullptr for unique_ptr
+        }
     }
     
     if (ws_thread.joinable())
@@ -238,7 +242,7 @@ int OricBoard::config_board (std::string config, std::string &response)
                 return res;
             }
         }
-        catch (const std::exception &e)
+        catch (const std::exception &)
         {
             safe_logger (spdlog::level::err, "Invalid wreg command format: {}", config);
             response = "Invalid command format";
@@ -264,6 +268,8 @@ int OricBoard::config_board (std::string config, std::string &response)
 
 int OricBoard::send_command (const std::string &command, const std::vector<int> &parameters)
 {
+    std::lock_guard<std::mutex> lock(ws_mutex);
+    
     if (!connected || !ws)
     {
         safe_logger (spdlog::level::err, "Not connected to Oric board");
@@ -284,7 +290,7 @@ int OricBoard::send_command (const std::string &command, const std::vector<int> 
     }
     catch (const std::exception &e)
     {
-        safe_logger (spdlog::level::err, "Exception sending command: {}", e.what ());
+        safe_logger (spdlog::level::err, "Exception sending command: {}", e.what());
         return (int)BrainFlowExitCodes::GENERAL_ERROR;
     }
 }
@@ -338,13 +344,16 @@ int OricBoard::initialize_ads1299 ()
 void OricBoard::process_data (const std::vector<uint8_t> &data)
 {
     // Extract accelerometer data from the end of the packet
+    if (data.size() < ACCEL_DATA_SIZE) return;
+    
     std::vector<uint8_t> accel_data (data.end () - ACCEL_DATA_SIZE, data.end ());
     int16_t accel_x = static_cast<int16_t>((accel_data[1] << 8) | accel_data[0]);
     int16_t accel_y = static_cast<int16_t>((accel_data[3] << 8) | accel_data[2]);
     int16_t accel_z = static_cast<int16_t>((accel_data[5] << 8) | accel_data[4]);
     
     // Process EEG data part
-    std::vector<uint8_t> eeg_data (data.begin (), data.end () - ACCEL_DATA_SIZE);
+    size_t eeg_data_size = data.size() - ACCEL_DATA_SIZE;
+    std::vector<uint8_t> eeg_data (data.begin (), data.begin () + eeg_data_size);
     
     for (size_t block_location = 0; block_location < eeg_data.size (); block_location += BLOCK_SIZE)
     {
@@ -364,7 +373,9 @@ void OricBoard::process_data (const std::vector<uint8_t> &data)
         
         for (int channel = 0; channel < 8; channel++)
         {
-            int channel_offset = 8 + (channel * 3);
+            size_t channel_offset = 8 + (channel * 3);
+            if (channel_offset + 2 >= block.size()) break;
+            
             int32_t sample = (block[channel_offset] << 16) | 
                             (block[channel_offset + 1] << 8) | 
                             block[channel_offset + 2];
@@ -386,24 +397,24 @@ void OricBoard::process_data (const std::vector<uint8_t> &data)
         // Data validation (similar to your Python code)
         if (previous_sample_number != -1)
         {
-            if (sample_number - previous_sample_number > 1)
+            if (static_cast<int64_t>(sample_number) - previous_sample_number > 1)
             {
                 safe_logger (spdlog::level::warn, "Sample lost: previous={}, current={}", 
                             previous_sample_number, sample_number);
             }
-            else if (sample_number == previous_sample_number)
+            else if (sample_number == static_cast<uint32_t>(previous_sample_number))
             {
                 safe_logger (spdlog::level::warn, "Duplicate sample: {}", sample_number);
             }
-            else if (sample_number < previous_sample_number)
+            else if (sample_number < static_cast<uint32_t>(previous_sample_number))
             {
                 safe_logger (spdlog::level::warn, "Sample order missed: previous={}, current={}", 
                             previous_sample_number, sample_number);
             }
         }
         
-        previous_sample_number = sample_number;
-        previous_timestamp = timestamp;
+        previous_sample_number = static_cast<int>(sample_number);
+        previous_timestamp = static_cast<int64_t>(timestamp);
         
         // Check for blank data
         bool is_blank = true;
@@ -442,37 +453,48 @@ void OricBoard::process_data (const std::vector<uint8_t> &data)
 
 void OricBoard::ws_thread_func ()
 {
-    while (keep_alive && ws)
+    while (keep_alive)
     {
         try
         {
-            // Poll for messages (non-blocking)
-            ws->poll();
-            
-            // Receive messages
-            ws->dispatch([this](const std::string& message) {
-                if (!is_streaming) return;
-                
-                // Convert string to byte array
-                std::vector<uint8_t> data(message.begin(), message.end());
-                
-                if (data.size() == OricBoard::EXPECTED_PACKET_SIZE)
+            // Check if WebSocket exists and is connected
+            {
+                std::lock_guard<std::mutex> lock(ws_mutex);
+                if (!ws || ws->getReadyState() != easywsclient::WebSocket::OPEN)
                 {
-                    process_data(data);
+                    connected = false;
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                    continue;
                 }
-                else if (data.size() > 0)
-                {
-                    safe_logger(spdlog::level::debug, "Received packet size: {} (expected: {})", 
-                               data.size(), OricBoard::EXPECTED_PACKET_SIZE);
-                }
-            });
+                
+                // Poll for messages (non-blocking)
+                ws->poll();
+                
+                // Receive messages
+                ws->dispatch([this](const std::string& message) {
+                    if (!is_streaming) return;
+                    
+                    // Convert string to byte array
+                    std::vector<uint8_t> data(message.begin(), message.end());
+                    
+                    if (data.size() == OricBoard::EXPECTED_PACKET_SIZE)
+                    {
+                        process_data(data);
+                    }
+                    else if (!message.empty())
+                    {
+                        safe_logger(spdlog::level::debug, "Received packet size: {} (expected: {})", 
+                                   data.size(), OricBoard::EXPECTED_PACKET_SIZE);
+                    }
+                });
+            }
             
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
         catch (const std::exception &e)
         {
             safe_logger(spdlog::level::err, "Error in WebSocket thread: {}", e.what());
-            break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
     }
     

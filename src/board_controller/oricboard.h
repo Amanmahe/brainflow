@@ -1,7 +1,6 @@
 #pragma once
 
 #include "board.h"
-#include "easywsclient.hpp"
 #include <thread>
 #include <atomic>
 #include <vector>
@@ -9,7 +8,9 @@
 #include <queue>
 #include <nlohmann/json.hpp>
 
-using easywsclient::WebSocket;
+namespace easywsclient {
+    class WebSocket;
+}
 
 class OricBoard : public Board
 {
@@ -25,7 +26,7 @@ public:
 
 private:
     // WebSocket connection
-    WebSocket::pointer ws;
+    std::unique_ptr<easywsclient::WebSocket> ws;
     std::string ws_url;
     
     // Thread management
@@ -43,8 +44,8 @@ private:
         EXPECTED_PACKET_SIZE = (BLOCK_SIZE * SAMPLES_PER_BUFFER) + ACCEL_DATA_SIZE
     };
     
-    int previous_sample_number;
-    int previous_timestamp;
+    int64_t previous_sample_number;
+    int64_t previous_timestamp;
     
     // WebSocket thread function
     void ws_thread_func ();
