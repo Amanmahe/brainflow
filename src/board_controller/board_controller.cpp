@@ -55,6 +55,8 @@
 #include "synchroni_board.h"
 #include "synthetic_board.h"
 #include "unicorn_board.h"
+#include "oricboard.h"
+
 
 using json = nlohmann::json;
 
@@ -119,6 +121,9 @@ int prepare_session (int board_id, const char *json_brainflow_input_params)
             break;
         case BoardIds::CYTON_WIFI_BOARD:
             board = std::shared_ptr<Board> (new CytonWifi (params));
+            break;
+        case BoardIds::ORIC_BOARD:
+            board = std::shared_ptr<Board> (new OricBoard (params));
             break;
         case BoardIds::CYTON_DAISY_WIFI_BOARD:
             board = std::shared_ptr<Board> (new CytonDaisyWifi (params));

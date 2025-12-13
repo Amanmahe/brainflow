@@ -23,6 +23,7 @@ else (CMAKE_SIZEOF_VOID_P EQUAL 8)
 endif (CMAKE_SIZEOF_VOID_P EQUAL 8)
 
 SET (BOARD_CONTROLLER_SRC
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/easywsclient.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/timestamp.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/data_buffer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/os_serial.cpp
@@ -85,6 +86,7 @@ SET (BOARD_CONTROLLER_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/board_controller/synchroni/synchroni_board.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/board_controller/neuropawn/knight.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/board_controller/biolistener/biolistener.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/board_controller/oricboard.cpp
 )
 
 include (${CMAKE_CURRENT_SOURCE_DIR}/src/board_controller/ant_neuro/build.cmake)
@@ -112,6 +114,10 @@ endif (BUILD_BLUETOOTH)
 if (BUILD_BLE)
     add_subdirectory (${CMAKE_CURRENT_SOURCE_DIR}/third_party/SimpleBLE/simpleble)
 endif (BUILD_BLE)
+if (NOT BUILD_ORIC_BOARD)
+    list (FILTER BOARD_CONTROLLER_SOURCES EXCLUDE REGEX ".*oricboard.*")
+endif()
+
 
 add_library (
     ${BOARD_CONTROLLER_NAME} SHARED
@@ -163,6 +169,17 @@ set_target_properties (${BOARD_CONTROLLER_NAME}
     LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/compiled
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/compiled
 )
+
+if (BUILD_ORIC_BOARD AND BOOST_FOUND)
+    set(BOARD_CONTROLLER_LIBS ${BOARD_CONTROLLER_LIBS} ${Boost_LIBRARIES})
+    if (UNIX AND NOT APPLE)
+        # On Linux, we may need to link pthread explicitly
+        find_package(Threads QUIET)
+        if (Threads_FOUND)
+            set(BOARD_CONTROLLER_LIBS ${BOARD_CONTROLLER_LIBS} Threads::Threads)
+        endif()
+    endif()
+endif()
 
 if (USE_LIBFTDI)
     find_package (LibFTDI1 NO_MODULE)

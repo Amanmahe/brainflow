@@ -1,4 +1,4 @@
-﻿using System.Runtime.InteropServices;
+﻿﻿using System.Runtime.InteropServices;
 
 
 namespace brainflow
@@ -121,6 +121,7 @@ namespace brainflow
         SYNCHRONI_UNO_1_CHANNELS_BOARD = 62,
         OB3000_24_CHANNELS_BOARD = 63,
         BIOLISTENER_BOARD = 64,
+        ORIC_BOARD = 65
     };
 
 

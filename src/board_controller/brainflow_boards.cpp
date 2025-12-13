@@ -82,7 +82,8 @@ BrainFlowBoards::BrainFlowBoards()
             {"61", json::object()},
             {"62", json::object()},
             {"63", json::object()},
-            {"64", json::object()}
+            {"64", json::object()},
+            {"65", json::object()}
         }
     }};
 
@@ -1134,6 +1135,18 @@ BrainFlowBoards::BrainFlowBoards()
         {"battery_channel", 8},
         {"other_channels", {9, 10}}
     };
+    brainflow_boards_json["boards"]["65"]["default"] = {
+        {"name", "OricBoard"},
+        {"sampling_rate", 500},
+        {"package_num_channel", 11},    // Sample number is channel 11
+        {"timestamp_channel", 12},      // Timestamp is channel 12  
+        {"marker_channel", 13},         // Marker channel is channel 13
+        {"num_rows", 14},               // 13 from device + 1 marker channel = 14 total
+        {"eeg_channels", {1, 2, 3, 4, 5, 6, 7, 8}},
+        {"accel_channels", {9, 10, 11}},
+        {"eeg_names", {"Fp1", "Fp2", "C3", "C4", "P7", "P8", "O1", "O2"}}
+    };
+
 }
 
 BrainFlowBoards boards_struct;
