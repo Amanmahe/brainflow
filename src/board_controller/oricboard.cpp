@@ -19,8 +19,8 @@ OricBoard::OricBoard (struct BrainFlowInputParams params)
     keep_alive = false;
     connected = false;
     session_prepared = false;
-    previous_sample_number = 0;
-    previous_timestamp = 0;
+    previous_sample_number = -1;
+    previous_timestamp = -1;
 
     // Construct WebSocket URL from params
     if (params.ip_address.empty ())
@@ -402,7 +402,7 @@ void OricBoard::process_data (const std::vector<uint8_t> &data)
             {
                 safe_logger (spdlog::level::warn, "Duplicate sample: {}", sample_number);
             }
-            else if (sample_number < previous_sample_number)
+            else if (sample_number < static_cast<uint32_t>(previous_sample_number))
             {
                 safe_logger (spdlog::level::warn, "Sample order missed: previous={}, current={}",
                     previous_sample_number, sample_number);
