@@ -27,14 +27,12 @@ private:
     // WebSocket connection
     WebSocket::pointer ws;
     std::string ws_url;
-    
     // Thread management
     std::thread ws_thread;
     std::atomic<bool> is_streaming;
     std::atomic<bool> keep_alive;
     std::atomic<bool> connected;
     std::atomic<bool> session_prepared;
-    
     // Data processing
     enum Constants
     {
@@ -46,7 +44,6 @@ private:
     
     int previous_sample_number;
     int previous_timestamp;
-    
     // WebSocket thread function
     void ws_thread_func ();
     
@@ -54,6 +51,5 @@ private:
     int send_command (const std::string &command, const std::vector<int> &parameters = {});
     int initialize_ads1299 ();
     void process_data (const std::vector<uint8_t> &data);
-    
     std::mutex ws_mutex;
 };
