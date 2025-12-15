@@ -41,12 +41,10 @@ private:
         ACCEL_DATA_SIZE = 6,
         EXPECTED_PACKET_SIZE = (BLOCK_SIZE * SAMPLES_PER_BUFFER) + ACCEL_DATA_SIZE
     };
-    
     int previous_sample_number;
     int previous_timestamp;
     // WebSocket thread function
     void ws_thread_func ();
-    
     // Board commands
     int send_command (const std::string &command, const std::vector<int> &parameters = {});
     int initialize_ads1299 ();
