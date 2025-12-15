@@ -49,13 +49,13 @@
 #include "muse_bled.h"
 #include "notion_osc.h"
 #include "ntl_wifi.h"
+#include "oricboard.h"
 #include "pieeg_board.h"
 #include "playback_file_board.h"
 #include "streaming_board.h"
 #include "synchroni_board.h"
 #include "synthetic_board.h"
 #include "unicorn_board.h"
-#include "oricboard.h"
 
 
 using json = nlohmann::json;

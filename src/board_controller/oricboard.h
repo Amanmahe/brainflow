@@ -2,12 +2,12 @@
 
 #include "board.h"
 #include "easywsclient.hpp"
-#include <thread>
 #include <atomic>
-#include <vector>
 #include <mutex>
-#include <queue>
 #include <nlohmann/json.hpp>
+#include <queue>
+#include <thread>
+#include <vector>
 
 using easywsclient::WebSocket;
 
@@ -36,7 +36,8 @@ private:
     std::atomic<bool> session_prepared;
     
     // Data processing
-    enum Constants {
+    enum Constants
+    {
         BLOCK_SIZE = 32,
         SAMPLES_PER_BUFFER = 10,
         ACCEL_DATA_SIZE = 6,
